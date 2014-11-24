@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <nfc/nfc.h>
 #include <freefare.h>
-#include mifare_key.h
+#include "mifare_key.h"
 
 nfc_context *g_context = NULL;
 nfc_device *g_device = NULL;
