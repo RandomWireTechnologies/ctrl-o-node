@@ -81,6 +81,8 @@ class MemberDatabase():
             self.check()
     
     def get_node_type(self):
+        if(self.check() == False):
+            return None
         result = self.cur.execute("""SELECT type from nodes where name=%s""",self.hostname)
         self.dbh.commit()
         if (result > 0):
