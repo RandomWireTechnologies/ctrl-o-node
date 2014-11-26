@@ -5,6 +5,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Config files
+config.py
+mifare_key.h
+
 # Distribution / packaging
 .Python
 env/
