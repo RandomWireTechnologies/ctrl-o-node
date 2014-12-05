@@ -17,10 +17,10 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-RED_LED = 23
-BLUE_LED = 24
-GREEN_LED = 22
-DOOR_LATCH = 25
+RED_LED = 22
+BLUE_LED = 17
+GREEN_LED = 27
+DOOR_LATCH = 2
 FILE_CMD_PATH = "/opt/nfc/doorcmds/"
 FILE_CMD_GLOB = "/opt/nfc/doorcmds/*"
 FILE_CMD_OPEN = "/opt/nfc/doorcmds/open"
