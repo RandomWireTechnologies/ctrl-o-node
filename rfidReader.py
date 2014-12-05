@@ -56,7 +56,7 @@ def init():
     global remoteDB
     global nodeType
     localDB = database.MemberDatabase(config.localDBHost,config.localDBUser,config.localDBPass,config.localDBDatabase)
-    remoteDB = database.MemberDatabase(config.remoteDBHost,config.remoteDBUser,config.remoteDBPass,config.remoteDBDatabase)
+    remoteDB = database.MemberDatabase(config.remoteDBHost,config.remoteDBUser,config.remoteDBPass,config.remoteDBDatabase,config.remoteDBPort,config.remoteDBSSL)
     nodeType = localDB.get_node_type()
     init_gpio()
     clearFileCmds()

@@ -24,7 +24,7 @@ def is_number(s):
 
 # Database class
 class MemberDatabase():
-    def __init__(self,host="localhost",user="",passwd="",database=None):
+    def __init__(self,host="localhost",user="",passwd="",database=None,port=3306,ssl=None):
         # Setup database handlers
         self.sqlCacheFile = "/opt/nfc/cache/%s_log.sql" % (host)
         self.hostname = (socket.gethostname())
@@ -32,6 +32,8 @@ class MemberDatabase():
         self.user = user
         self.passwd = passwd
         self.database = database
+        self.port = port
+        self.ssl = ssl
         self.dbh = None
         self.cur = None
         self.lastPing = time.time()
@@ -41,7 +43,7 @@ class MemberDatabase():
     def connect(self):
         # Check for connection then try to connection
         try:
-            self.dbh = MySQLdb.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database) # name of the data base
+            self.dbh = MySQLdb.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
             self.cur = self.dbh.cursor()
             logger.info("Connected to database : %s" % self.host)
             return True

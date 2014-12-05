@@ -7,12 +7,14 @@ hashSecret = "Add your secret here"
 
 # The local mysql database running on the Pi
 localDBHost = "localhost"
-localDBUser = "root"
-localDBPass = "YourDBSecretPassword"
-localDBDatabase = "member_web"
+localDBUser = "ctrl-o"
+localDBPass = "ctrl-o-db-password"
+localDBDatabase = "ctrl-o"
 
 # The central mysql database which is used to update logs
-remoteDBHost = "myname.ctrl-o.us"
-remoteDBUser = "root"
-remoteDBPass = "YourDBSecretPassword"
-remoteDBDatabase = "member_web"
+remoteDBHost = "you.randomwire.biz"
+remoteDBUser = "ctrl-o"
+remoteDBPass = "ctrl-o-db-password"
+remoteDBDatabase = "ctrl-o"
+remoteDBPort = 6779
+remoteDBSSL = {'ca':'/etc/mysql/ca-cert.pem'}
