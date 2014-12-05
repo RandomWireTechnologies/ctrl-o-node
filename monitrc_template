@@ -1,0 +1,21 @@
+set daemon 5
+set logfile /var/log/monit.log
+set idfile /var/lib/monit/id
+set statefile /var/lib/monit/state
+# set mailserver mydomain.com with timeout 30 seconds,
+#    using HOSTNAME mydomain.com
+# set eventqueue
+#    basedir /var/lib/monit/events
+#    slots 100
+# set mail-format { from: ctrl-o@randomwire.biz }
+# set alert youremail@address.com with reminder on 10 cycles
+# set httpd port 2812 and
+#    use address 0.0.0.0
+#    allow admin:monit
+check process nfc with pidfile /var/run/nfc.pid
+    start program = "/etc/init.d/nfc start" with timeout 60 seconds
+    stop program  = "/etc/init.d/nfc stop"
+check process mysqld with pidfile /var/run/mysqld/mysqld.pid
+    start program = "/etc/init.d/mysql start"
+    stop program = "/etc/init.d/mysql stop"
+include /etc/monit/conf.d/*
