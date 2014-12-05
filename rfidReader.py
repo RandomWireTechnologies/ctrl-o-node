@@ -212,17 +212,18 @@ def poll():
     if (is_number(card_id) == False):
         ledUpdate("bad serial")
         return None
-    # Update card hash
-    new_hash = nfc.generateNewHash(card[1])
-    if (nfc.writeHash(new_hash[0])):
-        # Update database
-        remoteDB.update_hash(card_id,new_hash[1])
-    else:
-        # Set fault bit on card
-        remoteDB.update_hash(card_id,card[1],1)
-        ledUpdate("bad hash")
-        return None
-    
+    # Update card hash if configured
+    if (config.rehash):
+        new_hash = nfc.generateNewHash(card[1])
+        if (nfc.writeHash(new_hash[0])):
+            # Update database
+            remoteDB.update_hash(card_id,new_hash[1])
+        else:
+            # Set fault bit on card
+            remoteDB.update_hash(card_id,card[1],1)
+            ledUpdate("bad hash")
+            return None
+        
     # Check for access
     access_status = localDB.check_valid_access(card_id, remoteDB)
     if (access_status != True):

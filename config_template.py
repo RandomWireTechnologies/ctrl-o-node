@@ -4,6 +4,7 @@
 
 # Hash secret is used to add uniqueness to the way a new hash is generated.
 hashSecret = "Add your secret here"
+rehash = True
 
 # The local mysql database running on the Pi
 localDBHost = "localhost"
