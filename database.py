@@ -5,6 +5,7 @@ import socket # for getting hostname/node_id
 import time
 import os
 import logging
+import subprocess
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,7 +36,6 @@ class MemberDatabase():
         self.port = port
         self.ssl = ssl
         self.dbh = None
-        self.cur = None
         self.lastPing = time.time()
         self.pingRate = 30 # This is the time in seconds between database pings
         self.connect()
@@ -44,13 +44,12 @@ class MemberDatabase():
         # Check for connection then try to connection
         try:
             self.dbh = MySQLdb.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
-            self.cur = self.dbh.cursor()
+            cur = self.dbh.cursor()
             logger.info("Connected to database : %s" % self.host)
             return True
         except:
-            if (self.cur != None):
-                self.cur.close()
-            self.cur = None
+            if (cur != None):
+                cur.close()
             self.dbh = None
             logger.info("Failed to connect to database : %s" % self.host)
             return False        
@@ -73,10 +72,22 @@ class MemberDatabase():
                 self.dbh.ping()
                 return True
             except:
-                self.cur.close()
-                self.cur = None
                 self.dbh = None
                 return False
+    
+    def check_replication(self):
+        if (!self.check()):
+            return None
+        c = self.dbh.cursor()
+        c.execute("""show slave status""")
+        status=c.fetchone()
+        c.close()
+        if (status[10] == "No") or (status[11] == "No"):
+            # We have a problem
+            if (self.host == "localhost") or (self.host == "127.0.0.1"):
+                subprocess.call("fixLocalDatabase.sh")
+            return False
+        return True        
     
     def periodic_database_ping(self):
         if ((time.time()-self.lastPing) > self.pingRate):
@@ -85,18 +96,24 @@ class MemberDatabase():
     def get_node_type(self):
         if(self.check() == False):
             return None
-        result = self.cur.execute("""SELECT type from nodes where name=%s""",self.hostname)
+        cur = self.dbh.cursor()
+        result = cur.execute("""SELECT type from nodes where name=%s""",self.hostname)
         self.dbh.commit()
         if (result > 0):
-            return self.cur.fetchone()[0]
+            output = cur.fetchone()[0]
+            cur.close()
+            return output
         return None
     
     def log(self,card_id,user_id,status,type='DOOR_SWYPE'):
         now = time.strftime("%Y-%m-%d %H:%M:%S")
         if(self.check()):
-            node_status = self.cur.execute("""SELECT id from nodes where name=%s""",self.hostname)
+            cur = self.dbh.cursor()
+            node_status = cur.execute("""SELECT id from nodes where name=%s""",self.hostname)
             if(node_status > 0):
-                node_id = self.cur.fetchone()[0]
+                node_id = cur.fetchone()[0]
+                cur.close()
+                cur = self.dbh.cursor()
                 if((card_id == None) or (card_id == "")) and ((user_id == None) or (user_id == "")):
                     insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,NULL,'%s','%s',NULL,NULL,'%s')" % (node_id,now,type,status)
                 elif (user_id == None) or (user_id == ""):
@@ -107,94 +124,118 @@ class MemberDatabase():
                     insert_data = "INSERT INTO log VALUES (NULL,'%s','%s','%s','%s','%s',NULL,NULL,'%s')" % (node_id,card_id,user_id,now,type,status)
                 self.cur.execute(insert_data)
                 self.dbh.commit()
+                self.cur.close()
                 return True
             # Save update to sql cache
+            cur.close()
             self.cache_sql(insert_data)
     
     def get_card_data(self, card_serial):
         # Find card in database
-        cards_found = self.cur.execute("""select * from cards where serial=%s""",card_serial)
-        self.dbh.commit()
-        if (cards_found == 0):
-            return None
-        card_data = self.cur.fetchone()
-        return card_data
+        if (self.check()):
+            cur = self.dbh.cursor()
+            cards_found = cur.execute("""select * from cards where serial=%s""",card_serial)
+            self.dbh.commit()
+            if (cards_found == 0):
+                cur.close()
+                return None
+            card_data = cur.fetchone()
+            cur.close()
+            return card_data
     
     def get_valid_card(self, card_serial, card_hash, remote_db):
         # Find card in database
-        cards_found = self.cur.execute("""select id,hash,enabled,fault,user_id from cards where serial=%s""",card_serial)
-        self.dbh.commit()
-        if (cards_found == 0):
-            # Card not found
-            logger.info("Error finding card serial: "+card_serial)
-            remote_db.log(None,None,"Access Denied - Serial "+card_serial+" not found")
-            return "No card found"
-        card_data = self.cur.fetchone()
-        # Check card hash
-        if (card_data[1] != card_hash):
-            if (card_data[3] == 0):    
-                logger.info("Error matching hash: card="+card_serial+",db="+card_data[1])
-                remote_db.log(card_data[0],card_data[4],"Access Denied - Bad Hash")
-                return "Bad hash"    
-        # Check card enabled 
-        if (card_data[2] == 0):
-            logger.info("Error - Card Id "+str(card_data[0])+" Disabled")
-            remote_db.log(card_data[0],card_data[4],"Access Denied - Card Disabled")
-            return "Card disabled"
-        # Valid card, so return the card_id
-        return card_data[0]     
+        if (self.check()):
+            cur = self.dbh.cursor()
+            cards_found = cur.execute("""select id,hash,enabled,fault,user_id from cards where serial=%s""",card_serial)
+            self.dbh.commit()
+            if (cards_found == 0):
+                cur.close()
+                # Card not found
+                logger.info("Error finding card serial: "+card_serial)
+                remote_db.log(None,None,"Access Denied - Serial "+card_serial+" not found")
+                return "No card found"
+            card_data = cur.fetchone()
+            cur.close()
+            # Check card hash
+            if (card_data[1] != card_hash):
+                if (card_data[3] == 0):    
+                    logger.info("Error matching hash: card="+card_serial+",db="+card_data[1])
+                    remote_db.log(card_data[0],card_data[4],"Access Denied - Bad Hash")
+                    return "Bad hash"    
+            # Check card enabled 
+            if (card_data[2] == 0):
+                logger.info("Error - Card Id "+str(card_data[0])+" Disabled")
+                remote_db.log(card_data[0],card_data[4],"Access Denied - Card Disabled")
+                return "Card disabled"
+            # Valid card, so return the card_id
+            return card_data[0]     
         
     
     def check_valid_access(self,card_id,remote_db):
-        users_found = self.cur.execute("""select user_id from cards where id='%s'""", card_id)
-        self.dbh.commit()
-        if (users_found > 0):
-            user_id = self.cur.fetchone()[0]
-            if (is_number(user_id) == False):
-                log("Error - No User Found for Card  ID "+str(card_id))
-                remote_db.log(card_id,None,"Access Denied - No User")
-                return "No user found"
-            membership_found = self.cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
-            # Adding commit to make sure transactions are completed (even selects!)
+        if (self.check()):
+            cur = self.dbh.cursor()
+            users_found = cur.execute("""select user_id from cards where id='%s'""", card_id)
             self.dbh.commit()
-            if (membership_found > 0):
-                # Found a membership so lets open the door (should actuatlly check the membership types in this result to see if we open the door
-                member_type_id = self.cur.fetchone()[0]
-                ##### CHECK TO SEE IF THIS USER HAS ACCESS TO THIS NODE
-                
-                # Access granted, log to database
-                if (remote_db != None):
-                    remote_db.log(card_id,user_id,"Access Granted")
-                return True
+            if (users_found > 0):
+                user_id = cur.fetchone()[0]
+                cur.close()
+                if (is_number(user_id) == False):
+                    log("Error - No User Found for Card  ID "+str(card_id))
+                    remote_db.log(card_id,None,"Access Denied - No User")
+                    return "No user found"
+                cur = self.dbh.cursor()
+                membership_found = cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
+                # Adding commit to make sure transactions are completed (even selects!)
+                self.dbh.commit()
+                if (membership_found > 0):
+                    # Found a membership so lets open the door (should actuatlly check the membership types in this result to see if we open the door
+                    member_type_id = cur.fetchone()[0]
+                    cur.close()
+                    ##### CHECK TO SEE IF THIS USER HAS ACCESS TO THIS NODE
+                    
+                    # Access granted, log to database
+                    if (remote_db != None):
+                        remote_db.log(card_id,user_id,"Access Granted")
+                    return True
+                else:
+                    cur.close()
+                    logger.info("Error - No Membership found for user id "+str(user_id))
+                    remote_db.log(card_id,user_id,"Access Denied - No Membership")
+                    return "Membership not found"
             else:
-                logger.info("Error - No Membership found for user id "+str(user_id))
-                remote_db.log(card_id,user_id,"Access Denied - No Membership")
-                return "Membership not found"
-        else:
-            logger.info("Error - No User Found for Card  ID "+str(card_id))
-            remote_db.log(card_id,None,"Access Denied - No User")
-            return "No user found"    
-        return False
+                cur.close()
+                logger.info("Error - No User Found for Card  ID "+str(card_id))
+                remote_db.log(card_id,None,"Access Denied - No User")
+                return "No user found"    
+            return False
     
     def add_card(self,card_serial,card_hash):
-        # Add new card to database
-        self.cur.execute("""insert into cards values(NULL,NULL,%s,%s,%s,0,0,NULL)""",("New Card #"+card_serial,card_serial,card_hash))
-        self.dbh.commit()
-        # Log new card being added
-        cardId = self.cur.lastrowid
-        logger.info("Card added! id="+str(cardId)+" serial="+card_serial+" hash="+card_hash)
-        # Log this to db
-        self.log(cardId,None,'Card Added','CARD_ADD')
+        if (self.check()):
+            cur = self.dbh.cursor()
+            # Add new card to database
+            cur.execute("""insert into cards values(NULL,NULL,%s,%s,%s,0,0,NULL)""",("New Card #"+card_serial,card_serial,card_hash))
+            self.dbh.commit()
+            # Log new card being added
+            cardId = cur.lastrowid
+            cur.close()
+            logger.info("Card added! id="+str(cardId)+" serial="+card_serial+" hash="+card_hash)
+            # Log this to db
+            self.log(cardId,None,'Card Added','CARD_ADD')
         
     def update_hash(self,card_id,new_hash, fault=0):
         update_data = "update cards set hash='%s',fault='%s' where id='%s'" % (new_hash,fault,card_id)
         if(self.check()):
             try:
-                self.cur.execute(update_data)
+                cur = self.dbh.cursor()
+                cur.execute(update_data)
                 self.dbh.commit()
+                cur.close()
             except Exception as e:
                 logger.info("Failed to update hash, error=%s" % str(e))
                 self.cache_sql(update_data)
+                if (cur != None):
+                    cur.close()
         else:
             # Save update to sql cache
             self.cache_sql(update_data)
@@ -220,10 +261,14 @@ class MemberDatabase():
                 return
             try:
                 for sql_cmd in sql_cmds:
-                    self.cur.execute(sql_cmd)
+                    cur = self.dbh.cursor()
+                    cur.execute(sql_cmd)
+                    cur.close()
                 self.dbh.commit()
             except:
                 logger.info("Failed to push SQL commands to database")
+                if (cur != None):
+                    cur.close()
                 return
             try:
                 os.remove(self.sqlCacheFile)
