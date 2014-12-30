@@ -122,9 +122,9 @@ class MemberDatabase():
                     insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,'%s','%s','%s',NULL,NULL,'%s')" % (node_id,user_id,now,type,status)
                 else:    
                     insert_data = "INSERT INTO log VALUES (NULL,'%s','%s','%s','%s','%s',NULL,NULL,'%s')" % (node_id,card_id,user_id,now,type,status)
-                self.cur.execute(insert_data)
+                cur.execute(insert_data)
                 self.dbh.commit()
-                self.cur.close()
+                cur.close()
                 return True
             # Save update to sql cache
             cur.close()
