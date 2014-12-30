@@ -234,6 +234,9 @@ static PyObject* pn532_read(PyObject *self, PyObject *args) {
     
     if ((tags == NULL) || (tags[0] == 0 )) {
         // Error?
+        if (tags != 0) {
+            freefare_free_tags(tags);
+        }
         return Py_BuildValue("");
     }
     tag_uid = freefare_get_tag_uid(tags[0]);
