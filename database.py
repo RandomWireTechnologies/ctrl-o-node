@@ -76,7 +76,7 @@ class MemberDatabase():
                 return False
     
     def check_replication(self):
-        if (!self.check()):
+        if (not self.check()):
             return None
         c = self.dbh.cursor()
         c.execute("""show slave status""")
