@@ -109,22 +109,17 @@ def ledUpdate(mode):
 
 
 
-def open_door():
-    if (nodeType == "INTERNAL_DOOR"):
-        GPIO.output(DOOR_LATCH, False) # relay 
-    else:
-        GPIO.output(DOOR_LATCH, True) # relay 
+def open_door(unlocked):
+    GPIO.output(DOOR_LATCH, True) # relay 
     logger.info("Door unlocked")
     subprocess.call(["/usr/local/bin/beep"])
     # Turn on success LED
     GPIO.output(GREEN_LED, True)
     time.sleep(5)
     # relock door after 5 seconds
-    if (nodeType == "INTERNAL_DOOR"):
-        GPIO.output(DOOR_LATCH, True) # relay 
-    else:
+    if not unlocked:
         GPIO.output(DOOR_LATCH, False) # relay 
-    logger.info("Door locked")
+        logger.info("Door locked")
     # Turn off success LED
     GPIO.output(GREEN_LED, False)   
  
@@ -160,6 +155,9 @@ def clearFileCmds():
     cmds = glob.glob(FILE_CMD_GLOB)
     for cmd in cmds:
         os.remove(cmd)
+
+def getAutoUnlockedState(db):
+    db.check_auto_open()
 
 def checkFileCmd():
     # Check to see if a local file is commanding action and if so do It
@@ -198,10 +196,24 @@ def is_number(s):
 
 def poll():
     card = None
+    unlocked = False
+    lastTime = time.time()
     logger.info("Waiting for new card")
     while (card == None):
         card = nfc.getCard()
         checkFileCmd()
+        if (time.time()-lastTime > 30):
+            new_unlocked = getAutoUnlockedState(localDB)
+            if (new_unlocked != unlocked):
+                if (unlocked):
+                    # Unlock the Door
+                    GPIO.output(DOOR_LATCH, True) # relay 
+                    logger.info("Door unlocked")
+                else:
+                    # Lock the Door
+                    GPIO.output(DOOR_LATCH, False) # relay 
+                    logger.info("Door locked")
+            unlocked = new_unlocked                     
         localDB.periodic_database_ping()
         remoteDB.periodic_database_ping()
     logger.info("Card found: serial="+card[0]+" hash="+card[1])
@@ -234,7 +246,7 @@ def poll():
         #db_log(cardData[0],cardData[1],"Access Granted")
         #log("Access Granted: Card ID=%s User ID=%s" % (card_id,cardData[1]))
         # Open Door
-        open_door()
+        open_door(unlocked)
         return True
 
 # Main

@@ -97,7 +97,19 @@ class MemberDatabase():
         if(self.check() == False):
             return None
         cur = self.dbh.cursor()
-        result = cur.execute("""SELECT type from nodes where name=%s""",self.hostname)
+        result = cur.execute("""SELECT type from nodes where hostname=%s""",self.hostname)
+        self.dbh.commit()
+        if (result > 0):
+            output = cur.fetchone()[0]
+            cur.close()
+            return output
+        return None
+    
+    def get_node_id(self):
+        if(self.check() == False):
+            return None
+        cur = self.dbh.cursor()
+        result = cur.execute("""SELECT id from nodes where hostname=%s""",self.hostname)
         self.dbh.commit()
         if (result > 0):
             output = cur.fetchone()[0]
@@ -109,7 +121,7 @@ class MemberDatabase():
         now = time.strftime("%Y-%m-%d %H:%M:%S")
         if(self.check()):
             cur = self.dbh.cursor()
-            node_status = cur.execute("""SELECT id from nodes where name=%s""",self.hostname)
+            node_status = cur.execute("""SELECT id from nodes where hostname=%s""",self.hostname)
             if(node_status > 0):
                 node_id = cur.fetchone()[0]
                 cur.close()
@@ -128,7 +140,8 @@ class MemberDatabase():
                 return True
             # Save update to sql cache
             cur.close()
-            self.cache_sql(insert_data)
+        self.cache_sql(insert_data)
+        return False
     
     def get_card_data(self, card_serial):
         # Find card in database
@@ -185,14 +198,17 @@ class MemberDatabase():
                     remote_db.log(card_id,None,"Access Denied - No User")
                     return "No user found"
                 cur = self.dbh.cursor()
-                membership_found = cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
+                user_access_found = cur.execute("""select id from access_user_priveleges where 
+                    (user_id = -1 OR user_id = %s) AND 
+                    (schedule_id is NULL OR schedule_id IN (select schedule_id from current_schedules )) AND 
+                    (membership_type_id is NULL OR 
+                    (membership_type_id=-1 AND %s IN (select user_id from current_memberships)) OR 
+                    (membership_type_id IN (select type_id from current_memberships where user_id=%s))""", [user_id,user_id,user_id])
+                #membership_found = cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
                 # Adding commit to make sure transactions are completed (even selects!)
                 self.dbh.commit()
-                if (membership_found > 0):
-                    # Found a membership so lets open the door (should actuatlly check the membership types in this result to see if we open the door
-                    member_type_id = cur.fetchone()[0]
+                if (user_access_found > 0):
                     cur.close()
-                    ##### CHECK TO SEE IF THIS USER HAS ACCESS TO THIS NODE
                     
                     # Access granted, log to database
                     if (remote_db != None):
@@ -201,7 +217,7 @@ class MemberDatabase():
                 else:
                     cur.close()
                     logger.info("Error - No Membership found for user id "+str(user_id))
-                    remote_db.log(card_id,user_id,"Access Denied - No Membership")
+                    remote_db.log(card_id,user_id,"Access Denied - No Priveleges")
                     return "Membership not found"
             else:
                 cur.close()
@@ -209,6 +225,16 @@ class MemberDatabase():
                 remote_db.log(card_id,None,"Access Denied - No User")
                 return "No user found"    
             return False
+           
+    def check_auto_open(self):
+        if (self.check()):
+            cur = self.dbh.cursor()
+            unlock_found = cur.execute("""select name from access_manual_unlock where node_id = %s AND enable=1 AND schedule_id IN (select schedule_id from current_schedules);""", self.get_node_id())
+            self.dbh.commit()
+            if (unlock_found > 0):
+                return True
+            else:
+                return False
     
     def add_card(self,card_serial,card_hash):
         if (self.check()):
