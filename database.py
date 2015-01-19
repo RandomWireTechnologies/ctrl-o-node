@@ -36,6 +36,7 @@ class MemberDatabase():
         self.port = port
         self.ssl = ssl
         self.dbh = None
+        self.node_id = None
         self.lastPing = time.time()
         self.pingRate = 30 # This is the time in seconds between database pings
         self.connect()
@@ -123,24 +124,33 @@ class MemberDatabase():
             cur = self.dbh.cursor()
             node_status = cur.execute("""SELECT id from nodes where hostname=%s""",self.hostname)
             if(node_status > 0):
-                node_id = cur.fetchone()[0]
+                self.node_id = cur.fetchone()[0]
                 cur.close()
                 cur = self.dbh.cursor()
                 if((card_id == None) or (card_id == "")) and ((user_id == None) or (user_id == "")):
-                    insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,NULL,'%s','%s',NULL,NULL,'%s')" % (node_id,now,type,status)
+                    insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,NULL,'%s','%s',NULL,NULL,'%s')" % (self.node_id,now,type,status)
                 elif (user_id == None) or (user_id == ""):
-                    insert_data = "INSERT INTO log VALUES (NULL,'%s','%s',NULL,'%s','%s',NULL,NULL,'%s')" % (node_id,card_id,now,type,status)
+                    insert_data = "INSERT INTO log VALUES (NULL,'%s','%s',NULL,'%s','%s',NULL,NULL,'%s')" % (self.node_id,card_id,now,type,status)
                 elif (card_id == None) or (card_id == ""):
-                    insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,'%s','%s','%s',NULL,NULL,'%s')" % (node_id,user_id,now,type,status)
+                    insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,'%s','%s','%s',NULL,NULL,'%s')" % (self.node_id,user_id,now,type,status)
                 else:    
-                    insert_data = "INSERT INTO log VALUES (NULL,'%s','%s','%s','%s','%s',NULL,NULL,'%s')" % (node_id,card_id,user_id,now,type,status)
+                    insert_data = "INSERT INTO log VALUES (NULL,'%s','%s','%s','%s','%s',NULL,NULL,'%s')" % (self.node_id,card_id,user_id,now,type,status)
                 cur.execute(insert_data)
                 self.dbh.commit()
                 cur.close()
                 return True
             # Save update to sql cache
             cur.close()
-        self.cache_sql(insert_data)
+        if (self.node_id != None):
+            if((card_id == None) or (card_id == "")) and ((user_id == None) or (user_id == "")):
+                insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,NULL,'%s','%s',NULL,NULL,'%s')" % (self.node_id,now,type,status)
+            elif (user_id == None) or (user_id == ""):
+                insert_data = "INSERT INTO log VALUES (NULL,'%s','%s',NULL,'%s','%s',NULL,NULL,'%s')" % (self.node_id,card_id,now,type,status)
+            elif (card_id == None) or (card_id == ""):
+                insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,'%s','%s','%s',NULL,NULL,'%s')" % (self.node_id,user_id,now,type,status)
+            else:    
+                insert_data = "INSERT INTO log VALUES (NULL,'%s','%s','%s','%s','%s',NULL,NULL,'%s')" % (self.node_id,card_id,user_id,now,type,status)
+            self.cache_sql(insert_data)
         return False
     
     def get_card_data(self, card_serial):
@@ -203,7 +213,7 @@ class MemberDatabase():
                     (schedule_id is NULL OR schedule_id IN (select schedule_id from current_schedules )) AND 
                     (membership_type_id is NULL OR 
                     (membership_type_id=-1 AND %s IN (select user_id from current_memberships)) OR 
-                    (membership_type_id IN (select type_id from current_memberships where user_id=%s))""", (user_id,user_id,user_id))
+                    (membership_type_id IN (select type_id from current_memberships where user_id=%s)))""", (user_id,user_id,user_id))
                 #membership_found = cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
                 # Adding commit to make sure transactions are completed (even selects!)
                 self.dbh.commit()
