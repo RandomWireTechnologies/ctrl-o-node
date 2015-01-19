@@ -203,7 +203,7 @@ class MemberDatabase():
                     (schedule_id is NULL OR schedule_id IN (select schedule_id from current_schedules )) AND 
                     (membership_type_id is NULL OR 
                     (membership_type_id=-1 AND %s IN (select user_id from current_memberships)) OR 
-                    (membership_type_id IN (select type_id from current_memberships where user_id=%s))""", [user_id,user_id,user_id])
+                    (membership_type_id IN (select type_id from current_memberships where user_id=%s))""", (user_id,user_id,user_id))
                 #membership_found = cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
                 # Adding commit to make sure transactions are completed (even selects!)
                 self.dbh.commit()
