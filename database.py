@@ -239,7 +239,7 @@ class MemberDatabase():
     def check_auto_open(self):
         if (self.check()):
             cur = self.dbh.cursor()
-            unlock_found = cur.execute("""select name from access_manual_unlock where node_id = %s AND enable=1 AND schedule_id IN (select schedule_id from current_schedules);""", self.get_node_id())
+            unlock_found = cur.execute("""select name from access_manual_unlock where node_id=%s AND enabled=1 AND schedule_id IN (select schedule_id from current_schedules);""", self.get_node_id())
             self.dbh.commit()
             if (unlock_found > 0):
                 return True
