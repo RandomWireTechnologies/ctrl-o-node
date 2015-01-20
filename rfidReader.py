@@ -202,10 +202,11 @@ def poll():
     while (card == None):
         card = nfc.getCard()
         checkFileCmd()
-        if (time.time()-lastTime > 30):
-            new_unlocked = getAutoUnlockedState(localDB)
+        if (time.time()-lastTime > 1):
+            new_unlocked = localDB.check_auto_open()
             if (new_unlocked != unlocked):
-                if (unlocked):
+                logger.info("Auto Unlock state changed from %s to %s"%(unlocked,new_unlocked))
+                if (new_unlocked):
                     # Unlock the Door
                     GPIO.output(DOOR_LATCH, True) # relay 
                     logger.info("Door unlocked")
@@ -213,7 +214,8 @@ def poll():
                     # Lock the Door
                     GPIO.output(DOOR_LATCH, False) # relay 
                     logger.info("Door locked")
-            unlocked = new_unlocked                     
+            unlocked = new_unlocked
+            lastTime - time.time()                     
         localDB.periodic_database_ping()
         remoteDB.periodic_database_ping()
     logger.info("Card found: serial="+card[0]+" hash="+card[1])

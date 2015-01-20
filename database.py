@@ -46,6 +46,7 @@ class MemberDatabase():
         try:
             self.dbh = MySQLdb.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
             cur = self.dbh.cursor()
+            self.get_node_id()
             logger.info("Connected to database : %s" % self.host)
             return True
         except:
@@ -114,6 +115,7 @@ class MemberDatabase():
         self.dbh.commit()
         if (result > 0):
             output = cur.fetchone()[0]
+            self.node_id = output;
             cur.close()
             return output
         return None
@@ -239,12 +241,15 @@ class MemberDatabase():
     def check_auto_open(self):
         if (self.check()):
             cur = self.dbh.cursor()
-            unlock_found = cur.execute("""select name from access_manual_unlock where node_id=%s AND enabled=1 AND schedule_id IN (select schedule_id from current_schedules);""", self.get_node_id())
-            self.dbh.commit()
-            if (unlock_found > 0):
-                return True
-            else:
-                return False
+            if (self.node_id != None):
+                unlock_found = cur.execute("""select name from access_manual_unlock where node_id=%s AND enabled=1 AND schedule_id IN (select schedule_id from current_schedules)""", (self.node_id))
+                self.dbh.commit()
+                cur.close()
+                if (unlock_found > 0):
+                    return True
+                else:
+                    return False
+            return None
     
     def add_card(self,card_serial,card_hash):
         if (self.check()):
