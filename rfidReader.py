@@ -55,6 +55,8 @@ def init():
     global localDB
     global remoteDB
     global nodeType
+    global lastAutoUnlockTime
+    lastAutoUnlockTime = time.time()
     localDB = database.MemberDatabase(config.localDBHost,config.localDBUser,config.localDBPass,config.localDBDatabase)
     remoteDB = database.MemberDatabase(config.remoteDBHost,config.remoteDBUser,config.remoteDBPass,config.remoteDBDatabase,config.remoteDBPort,config.remoteDBSSL)
     nodeType = localDB.get_node_type()
@@ -156,8 +158,22 @@ def clearFileCmds():
     for cmd in cmds:
         os.remove(cmd)
 
-def getAutoUnlockedState(db):
-    db.check_auto_open()
+def checkAutoUnlockedState():
+    global lastAutoUnlockTime
+    if (time.time()-lastAutoUnlockTime > 1):
+        unlocked = localDB.check_auto_open()
+        if (unlocked and (GPIO.input(DOOR_LATCH)==0)) or (not unlocked and (GPIO.input(DOOR_LATCH)==1)):
+            logger.info("Auto Unlock state changed to %s"%(unlocked))
+            if (unlocked):
+               # Unlock the Door
+               GPIO.output(DOOR_LATCH, True) # relay
+               logger.info("Door unlocked")
+            else:
+               # Lock the Door
+               GPIO.output(DOOR_LATCH, False) # relay
+               logger.info("Door locked")
+        lastAutoUnlockTime = time.time()
+
 
 def checkFileCmd():
     # Check to see if a local file is commanding action and if so do It
@@ -171,8 +187,7 @@ def checkFileCmd():
             fh.close()
         except:
             logger.info("Failed to read user id from command file")
-            user_id = None
-        # Check name for a valid command, and execute
+            user_id = No        # Check name for a valid command, and execute
         if (cmds[0] == FILE_CMD_OPEN):
             remoteDB.log(None,user_id,"Remote Door Unlock","REMOTE_CMD")
             logger.info("Remote unlock from user "+user_id)
@@ -202,20 +217,7 @@ def poll():
     while (card == None):
         card = nfc.getCard()
         checkFileCmd()
-        if (time.time()-lastTime > 1):
-            new_unlocked = localDB.check_auto_open()
-            if (new_unlocked != unlocked):
-                logger.info("Auto Unlock state changed from %s to %s"%(unlocked,new_unlocked))
-                if (new_unlocked):
-                    # Unlock the Door
-                    GPIO.output(DOOR_LATCH, True) # relay 
-                    logger.info("Door unlocked")
-                else:
-                    # Lock the Door
-                    GPIO.output(DOOR_LATCH, False) # relay 
-                    logger.info("Door locked")
-            unlocked = new_unlocked
-            lastTime - time.time()                     
+        checkAutoUnlockedState()
         localDB.periodic_database_ping()
         remoteDB.periodic_database_ping()
     logger.info("Card found: serial="+card[0]+" hash="+card[1])
