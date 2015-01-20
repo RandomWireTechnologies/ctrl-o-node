@@ -20,7 +20,7 @@ logger.addHandler(handler)
 RED_LED = 22
 BLUE_LED = 17
 GREEN_LED = 27
-DOOR_LATCH = 2
+DOOR_LATCH = 25
 FILE_CMD_PATH = "/opt/nfc/doorcmds/"
 FILE_CMD_GLOB = "/opt/nfc/doorcmds/*"
 FILE_CMD_OPEN = "/opt/nfc/doorcmds/open"
