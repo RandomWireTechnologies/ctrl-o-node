@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import MySQLdb
+import oursql
 import socket # for getting hostname/node_id
 import time
 import os
@@ -44,7 +44,7 @@ class MemberDatabase():
     def connect(self):
         # Check for connection then try to connection
         try:
-            self.dbh = MySQLdb.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
+            self.dbh = oursql.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
             cur = self.dbh.cursor()
             self.get_node_id()
             logger.info("Connected to database : %s" % self.host)
@@ -99,33 +99,39 @@ class MemberDatabase():
         if(self.check() == False):
             return None
         cur = self.dbh.cursor()
-        result = cur.execute("""SELECT type from nodes where hostname=%s""",self.hostname)
+        result = cur.execute("""SELECT type from nodes where hostname=?""",params=(self.hostname,))
         self.dbh.commit()
-        if (result > 0):
+        try:
             output = cur.fetchone()[0]
             cur.close()
             return output
+        except:
+            cur.close()
+            return None
         return None
     
     def get_node_id(self):
         if(self.check() == False):
             return None
         cur = self.dbh.cursor()
-        result = cur.execute("""SELECT id from nodes where hostname=%s""",self.hostname)
+        result = cur.execute("""SELECT id from nodes where hostname=?""",params=(self.hostname,))
         self.dbh.commit()
-        if (result > 0):
+        try:
             output = cur.fetchone()[0]
             self.node_id = output;
             cur.close()
             return output
+        except:
+            cur.close()
+            return None
         return None
     
     def log(self,card_id,user_id,status,type='DOOR_SWYPE'):
         now = time.strftime("%Y-%m-%d %H:%M:%S")
         if(self.check()):
             cur = self.dbh.cursor()
-            node_status = cur.execute("""SELECT id from nodes where hostname=%s""",self.hostname)
-            if(node_status > 0):
+            node_status = cur.execute("""SELECT id from nodes where hostname=?""",params=(self.hostname,))
+            try:
                 self.node_id = cur.fetchone()[0]
                 cur.close()
                 cur = self.dbh.cursor()
@@ -141,8 +147,9 @@ class MemberDatabase():
                 self.dbh.commit()
                 cur.close()
                 return True
-            # Save update to sql cache
-            cur.close()
+            except:
+                # Save update to sql cache
+                cur.close()
         if (self.node_id != None):
             if((card_id == None) or (card_id == "")) and ((user_id == None) or (user_id == "")):
                 insert_data = "INSERT INTO log VALUES (NULL,'%s',NULL,NULL,'%s','%s',NULL,NULL,'%s')" % (self.node_id,now,type,status)
@@ -159,50 +166,53 @@ class MemberDatabase():
         # Find card in database
         if (self.check()):
             cur = self.dbh.cursor()
-            cards_found = cur.execute("""select * from cards where serial=%s""",card_serial)
+            cards_found = cur.execute("""select * from cards where serial=?""",params=(card_serial,))
             self.dbh.commit()
-            if (cards_found == 0):
+            try:
+                card_data = cur.fetchone()
+                cur.close()
+                return card_data
+            except:
                 cur.close()
                 return None
-            card_data = cur.fetchone()
-            cur.close()
-            return card_data
     
     def get_valid_card(self, card_serial, card_hash, remote_db):
         # Find card in database
         if (self.check()):
             cur = self.dbh.cursor()
-            cards_found = cur.execute("""select id,hash,enabled,fault,user_id from cards where serial=%s""",card_serial)
+            cards_found = cur.execute("""select id,hash,enabled,fault,user_id from cards where serial=?""",params=(card_serial,))
             self.dbh.commit()
-            if (cards_found == 0):
+            try:
+                card_data = cur.fetchone()
+                cur.close()
+                # Check card hash
+                if (card_data[1] != card_hash):
+                    if (card_data[3] == 0):    
+                        logger.info("Error matching hash: card="+card_serial+",db="+card_data[1])
+                        remote_db.log(card_data[0],card_data[4],"Access Denied - Bad Hash")
+                        return "Bad hash"    
+                # Check card enabled 
+                if (card_data[2] == 0):
+                    logger.info("Error - Card Id "+str(card_data[0])+" Disabled")
+                    remote_db.log(card_data[0],card_data[4],"Access Denied - Card Disabled")
+                    return "Card disabled"
+                # Valid card, so return the card_id
+                return card_data[0]     
+                
+            except:
                 cur.close()
                 # Card not found
                 logger.info("Error finding card serial: "+card_serial)
                 remote_db.log(None,None,"Access Denied - Serial "+card_serial+" not found")
                 return "No card found"
-            card_data = cur.fetchone()
-            cur.close()
-            # Check card hash
-            if (card_data[1] != card_hash):
-                if (card_data[3] == 0):    
-                    logger.info("Error matching hash: card="+card_serial+",db="+card_data[1])
-                    remote_db.log(card_data[0],card_data[4],"Access Denied - Bad Hash")
-                    return "Bad hash"    
-            # Check card enabled 
-            if (card_data[2] == 0):
-                logger.info("Error - Card Id "+str(card_data[0])+" Disabled")
-                remote_db.log(card_data[0],card_data[4],"Access Denied - Card Disabled")
-                return "Card disabled"
-            # Valid card, so return the card_id
-            return card_data[0]     
         
     
     def check_valid_access(self,card_id,remote_db):
         if (self.check()):
             cur = self.dbh.cursor()
-            users_found = cur.execute("""select user_id from cards where id='%s'""", card_id)
+            users_found = cur.execute("""select user_id from cards where id=?""", params=(card_id,))
             self.dbh.commit()
-            if (users_found > 0):
+            try:
                 user_id = cur.fetchone()[0]
                 cur.close()
                 if (is_number(user_id) == False):
@@ -211,27 +221,28 @@ class MemberDatabase():
                     return "No user found"
                 cur = self.dbh.cursor()
                 user_access_found = cur.execute("""select id from access_user_priveleges where 
-                    (user_id = -1 OR user_id = %s) AND 
+                    (user_id = -1 OR user_id = ?) AND 
                     (schedule_id is NULL OR schedule_id IN (select schedule_id from current_schedules )) AND 
                     (membership_type_id is NULL OR 
-                    (membership_type_id=-1 AND %s IN (select user_id from current_memberships)) OR 
-                    (membership_type_id IN (select type_id from current_memberships where user_id=%s)))""", (user_id,user_id,user_id))
+                    (membership_type_id=-1 AND ? IN (select user_id from current_memberships)) OR 
+                    (membership_type_id IN (select type_id from current_memberships where user_id=?)))""", params=(user_id,user_id,user_id))
                 #membership_found = cur.execute("""select m.type_id from users as u,memberships as m where u.id=%s AND u.active = 1 AND u.suspend = 0 AND m.user_id = u.id AND m.start < NOW() AND m.end > NOW()""",user_id)
                 # Adding commit to make sure transactions are completed (even selects!)
                 self.dbh.commit()
-                if (user_access_found > 0):
+                try:
+                    cur.fetchone()[0]
                     cur.close()
                     
                     # Access granted, log to database
                     if (remote_db != None):
                         remote_db.log(card_id,user_id,"Access Granted")
                     return True
-                else:
+                except:
                     cur.close()
                     logger.info("Error - No Membership found for user id "+str(user_id))
                     remote_db.log(card_id,user_id,"Access Denied - No Priveleges")
                     return "Membership not found"
-            else:
+            except:
                 cur.close()
                 logger.info("Error - No User Found for Card  ID "+str(card_id))
                 remote_db.log(card_id,None,"Access Denied - No User")
@@ -242,12 +253,16 @@ class MemberDatabase():
         if (self.check()):
             cur = self.dbh.cursor()
             if (self.node_id != None):
-                unlock_found = cur.execute("""select name from access_manual_unlock where node_id=%s AND enabled=1 AND schedule_id IN (select schedule_id from current_schedules)""", (self.node_id))
+                unlock_found = cur.execute("""select name from access_manual_unlock where node_id=? AND enabled=1 AND schedule_id IN (select schedule_id from current_schedules)""", params=(self.node_id,))
                 self.dbh.commit()
-                cur.close()
-                if (unlock_found > 0):
-                    return True
-                else:
+                try:
+                    if cur.fetchone()[0] != "":
+                        cur.close()
+                        return True
+                    else:
+                        cur.close()
+                except:
+                    cur.close()
                     return False
             return None
     
@@ -255,7 +270,7 @@ class MemberDatabase():
         if (self.check()):
             cur = self.dbh.cursor()
             # Add new card to database
-            cur.execute("""insert into cards values(NULL,NULL,%s,%s,%s,0,0,NULL)""",("New Card #"+card_serial,card_serial,card_hash))
+            cur.execute("""insert into cards values(NULL,NULL,?,?,?,0,0,NULL)""",params=("New Card #"+card_serial,card_serial,card_hash))
             self.dbh.commit()
             # Log new card being added
             cardId = cur.lastrowid
