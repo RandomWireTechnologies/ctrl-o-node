@@ -183,7 +183,7 @@ def checkFileCmd():
         user_id = None
         try:
             fh = open(cmds[0],'r')
-            user_id = fh.readline()
+            user_id = fh.readline().rstrip()
             fh.close()
         except:
             logger.info("Failed to read user id from command file")
@@ -191,7 +191,7 @@ def checkFileCmd():
         if (cmds[0] == FILE_CMD_OPEN):
             remoteDB.log(None,user_id,"Remote Door Unlock","REMOTE_CMD")
             logger.info("Remote unlock from user "+user_id)
-            open_door()
+            open_door(False)
             os.remove(cmds[0])
         elif (cmds[0] == FILE_CMD_INIT):
             remoteDB.log(None,user_id,"Remote Card Init","REMOTE_CMD")
