@@ -1,5 +1,8 @@
 #!/bin/sh
 
+sudo apt-get update
+sudo apt-get install python-pip libmysqlclient-dev
+sudo pip install oursql
 if [ ! -f /usr/local/bin/beep ]; then
         sudo cp beep.sh /usr/local/bin/beep
 fi
