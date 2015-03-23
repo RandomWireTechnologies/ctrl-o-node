@@ -44,7 +44,7 @@ class MemberDatabase():
     def connect(self):
         # Check for connection then try to connection
         try:
-            self.dbh = oursql.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
+            self.dbh = oursql.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl, read_timeout=1) # name of the data base
             self.get_node_id()
             logger.info("Connected to database : %s" % self.host)
             return True
