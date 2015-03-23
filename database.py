@@ -45,16 +45,13 @@ class MemberDatabase():
         # Check for connection then try to connection
         try:
             self.dbh = oursql.connect(host=self.host, user=self.user, passwd=self.passwd, db=self.database, port=self.port, ssl=self.ssl) # name of the data base
-            cur = self.dbh.cursor()
             self.get_node_id()
             logger.info("Connected to database : %s" % self.host)
             return True
         except:
-            if (cur != None):
-                cur.close()
             self.dbh = None
             logger.info("Failed to connect to database : %s" % self.host)
-            return False        
+            return False
         
     def ping(self):
         # Check database connection
