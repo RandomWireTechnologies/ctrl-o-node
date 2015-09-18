@@ -227,7 +227,7 @@ def poll():
     card_id = localDB.get_valid_card(card[0],card[1],remoteDB)
     if (is_number(card_id) == False):
         ledUpdate("bad serial")
-        return None
+        return False
     # Update card hash if configured
     if (config.rehash):
         new_hash = nfc.generateNewHash(card[1])
@@ -238,13 +238,13 @@ def poll():
             # Set fault bit on card
             remoteDB.update_hash(card_id,card[1],1)
             ledUpdate("bad hash")
-            return None
+            return False
         
     # Check for access
     access_status = localDB.check_valid_access(card_id, remoteDB)
     if (access_status != True):
         ledUpdate(access_status)
-        return None
+        return False
     else:
         # Log Success
         #db_log(cardData[0],cardData[1],"Access Granted")
@@ -256,7 +256,7 @@ def poll():
 # Main
 init()
 while(1):
-    if not poll():
+    if poll() is None:
         time.sleep(1)
 print "Exited while(1)? We must be done?"
 nfc.close()
