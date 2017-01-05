@@ -72,7 +72,7 @@ void print_nfc_target(nfc_target* nt)
     if (nt == 0) {
         return;
     }
-    if (nt->nti.nai.btSak == 8) {
+    if (nt->nti.nai.btSak != 32) {
         printf("UID:");
         print_hex_buffer(uid,len);
         printf("\r\n");
