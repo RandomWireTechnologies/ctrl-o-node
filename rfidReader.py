@@ -21,6 +21,8 @@ RED_LED = 22
 BLUE_LED = 17
 GREEN_LED = 27
 DOOR_LATCH = 25
+VOLT_RELAY = 23
+DRY_CONTACT = 24
 FILE_CMD_PATH = "/opt/nfc/doorcmds/"
 FILE_CMD_GLOB = "/opt/nfc/doorcmds/*"
 FILE_CMD_OPEN = "/opt/nfc/doorcmds/open"
@@ -43,9 +45,11 @@ def init_gpio():
     GPIO.setup(BLUE_LED, GPIO.OUT) # blue LED
     GPIO.setup(RED_LED, GPIO.OUT) # red LED
     GPIO.setup(DOOR_LATCH, GPIO.OUT) # relay
+    GPIO.setup(VOLT_RELAY, GPIO.OUT) # voltage select relay
     GPIO.output(GREEN_LED, False) # green LED
     GPIO.output(BLUE_LED, False) # blue LED
     GPIO.output(RED_LED, False) # red LED
+    GPIO.output(VOLT_RELAY, True) # Voltage Relay, Default to 12V for now
     if (nodeType == "INTERNAL_DOOR"):
         GPIO.output(DOOR_LATCH, True) # relay 
     else:
